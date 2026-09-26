@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sentinel — Real-Time AI Model Integrity & Trust Layer</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Noto+Sans+Devanagari:wght@400;600;700&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <!-- Chart.js and Lucide Icons -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+  <!-- Top Navigation Bar -->
+  <header class="navbar">
+    <div class="brand-group">
+      <div class="brand-icon">
+        <i data-lucide="shield-check"></i>
+      </div>
+      <div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <h1 class="brand-title">SENTINEL</h1>
+          <span class="brand-tag">AI TRUST & INTEGRITY LAYER</span>
+        </div>
+        <p style="font-size: 11px; color: var(--text-muted);">Real-Time Poisoning Detection • SHAP Explainability • Vernacular Hindi Alerts • SHA-256 Audit Chain</p>
+      </div>
+    </div>
+
+    <div class="header-controls">
+      <!-- System Status -->
+      <div class="status-pill" id="system-status-pill">
+        <span class="status-dot"></span>
+        <span id="system-status-text">SENTINEL ONLINE</span>
+      </div>
+
+      <!-- Audit Chain Verification Badge -->
+      <div class="status-pill" style="border-color: var(--accent-cyan); color: var(--accent-cyan); background: rgba(0, 240, 255, 0.08);">
+        <i data-lucide="link" style="width: 14px; height: 14px;"></i>
+        <span id="audit-chain-badge">SHA-256 CHAIN: INTACT</span>
+      </div>
+
+      <!-- TTS Voice Alert Toggle -->
+      <button class="btn btn-outline" id="tts-toggle-btn" onclick="toggleVoiceAlerts()">
+        <i data-lucide="volume-2" id="tts-icon" style="width: 14px; height: 14px;"></i>
+        <span id="tts-label">Voice Alerts: ON</span>
+      </button>
+
+      <!-- 1-Click Auto Exhibition Demo Story Button -->
+      <button class="btn btn-demo-magic" onclick="triggerAutoDemo()">
+        <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i>
+        <span>Play Exhibition Demo Story</span>
+      </button>
+
+      <!-- Reset System -->
+      <button class="btn btn-outline" onclick="resetAllModels()" title="Reset all models to clean baseline">
+        <i data-lucide="rotate-ccw" style="width: 14px; height: 14px;"></i>
+        <span>Reset</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main App Layout -->
+  <main class="app-layout">
+
+    <!-- Top Summary Metrics -->
+    <section class="summary-grid">
+      <div class="glass-panel stat-card">
+        <div class="stat-title">Fleet Average Trust Score</div>
+        <div class="stat-value" id="fleet-trust-score" style="color: var(--status-healthy);">98.5%</div>
+        <div class="stat-subtitle">Across 2 Production Classifiers</div>
+      </div>
+      
+      <div class="glass-panel stat-card">
+        <div class="stat-title">Graduated Response Defense</div>
+        <div class="stat-value" id="defense-mode-val" style="color: var(--accent-cyan);">ACTIVE</div>
+        <div class="stat-subtitle">Auto-Throttling & Checkpoint Failover</div>
+      </div>
+
+      <div class="glass-panel stat-card">
+        <div class="stat-title">Adversarial Honeypots</div>
+        <div class="stat-value" id="honeypot-stat" style="color: var(--status-healthy);">ARMED (0 HITS)</div>
+        <div class="stat-subtitle">Seeded Bait Vectors Monitored</div>
+      </div>
+
+      <div class="glass-panel stat-card">
+        <div class="stat-title">Threat Intel Correlation</div>
+        <div class="stat-value" id="threat-stat" style="color: var(--text-primary);">CLEAN FEED</div>
+        <div class="stat-subtitle">Dark Web Breach Database Synced</div>
+      </div>
+    </section>
+
+    <!-- Cross-Model Trust Comparison & Model Selector -->
+    <section>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h2 style="font-size: 16px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">
+          <i data-lucide="layers" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 6px;"></i>
+          Cross-Model Risk Matrix & Fleet Telemetry
+        </h2>
+        <span style="font-size: 12px; color: var(--text-muted);">Select a model to view real-time diagnostics</span>
+      </div>
+
+      <div class="model-tabs" id="model-tabs-container">
+        <!-- Dynamic model tabs rendered by JS -->
+      </div>
+    </section>
+
+    <!-- Middle Telemetry Grid -->
+    <section class="dashboard-grid">
+
+      <!-- Column 1: Trust Gauge & Throttling Status -->
+      <div class="glass-panel gauge-container">
+        <div class="gauge-circle">
+          <svg class="gauge-svg" viewBox="0 0 200 200">
+            <circle class="gauge-bg" cx="100" cy="100" r="90"></circle>
+            <circle class="gauge-fill" id="gauge-circle-fill" cx="100" cy="100" r="90"></circle>
+          </svg>
+          <div class="gauge-center-text">
+            <div class="gauge-score" id="selected-trust-score">98.5</div>
+            <div class="gauge-label">TRUST SCORE</div>
+          </div>
+        </div>
+
+        <div class="status-banner-large" id="model-status-banner" style="background: rgba(16, 185, 129, 0.15); color: var(--status-healthy); border: 1px solid var(--status-healthy);">
+          HEALTHY • BASELINE VERIFIED
+        </div>
+
+        <!-- Throttling & Graduated Response Card -->
+        <div class="throttling-card" style="width: 100%;">
+          <div style="display: flex; justify-content: space-between; font-weight: 600;">
+            <span>Confidence Throttling:</span>
+            <span id="throttling-status-text" style="color: var(--accent-cyan);">NONE (Standard)</span>
+          </div>
+          <div class="throttling-meter">
+            <div class="throttling-fill" id="throttling-meter-fill" style="width: 50%;"></div>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted);">
+            <span>Auto-Approve Threshold: <strong id="throttle-threshold-val" style="color: #fff;">50%</strong></span>
+            <span>Manual Review: <strong id="manual-review-rate" style="color: #fff;">0%</strong></span>
+          </div>
+        </div>
+
+        <!-- SHAP Explainability Headline -->
+        <div style="margin-top: 14px; text-align: left; width: 100%; padding: 12px; background: rgba(0,0,0,0.3); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+          <div style="font-size: 11px; font-weight: 700; color: var(--accent-cyan); text-transform: uppercase; margin-bottom: 4px;">
+            <i data-lucide="brain" style="width: 12px; height: 12px; vertical-align: middle;"></i>
+            SHAP Explainability Summary
+          </div>
+          <p id="shap-summary-text" style="font-size: 12px; color: var(--text-secondary); line-height: 1.4;">
+            Model weights and feature distributions match verified clean baseline parameters.
+          </p>
+        </div>
+      </div>
+
+      <!-- Column 2: Live Feature Drift & Real-Time Transaction Stream -->
+      <div style="display: flex; flex-direction: column; gap: 20px;">
+        
+        <!-- Feature Drift PSI Bar Chart -->
+        <div class="glass-panel" style="padding: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <div class="section-title">
+              <i data-lucide="activity" style="color: var(--accent-cyan); width: 18px; height: 18px;"></i>
+              <span>Feature-Level PSI Drift Analysis</span>
+            </div>
+            <div style="font-size: 11px; color: var(--text-muted);">
+              Warning: <strong>PSI ≥ 0.10</strong> | Severe: <strong>PSI ≥ 0.25</strong>
+            </div>
+          </div>
+          <div style="height: 160px; position: relative;">
+            <canvas id="driftChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Live Prediction Stream Table -->
+        <div class="glass-panel">
+          <div class="section-header">
+            <div class="section-title">
+              <i data-lucide="radio" style="color: var(--status-healthy); width: 18px; height: 18px;"></i>
+              <span>Live Inference Stream & Decision Throttling</span>
+            </div>
+            <span class="brand-tag" id="stream-rate-badge">STREAMING (1.5s)</span>
+          </div>
+          <div class="stream-table-container">
+            <table class="stream-table">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Key Features</th>
+                  <th>Risk Score</th>
+                  <th>Sentinel Decision</th>
+                  <th>Integrity Flags</th>
+                </tr>
+              </thead>
+              <tbody id="stream-table-body">
+                <!-- Rows injected dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Column 3: Interactive Synthetic Attack Sandbox -->
+      <div class="glass-panel sandbox-card">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+          <i data-lucide="zap" style="color: #f72585; width: 22px; height: 22px;"></i>
+          <div>
+            <h3 style="font-size: 16px; font-weight: 800;">Exhibition Attack Sandbox</h3>
+            <p style="font-size: 11px; color: var(--text-muted);">Self-serve interactive attack simulator for booth visitors</p>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Target Protected Model</label>
+          <select class="select-input" id="sandbox-target-model">
+            <option value="model_fraud">Model 1: Payment Fraud Classifier</option>
+            <option value="model_kyc">Model 2: KYC & Credit Underwriting</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Attack Vector & Technique</label>
+          <select class="select-input" id="sandbox-attack-type">
+            <option value="GRADUAL_POISONING">1. Gradual Decision Boundary Poisoning</option>
+            <option value="ADVERSARIAL_CANARY_PROBING">2. Adversarial Canary Honeypot Probing</option>
+            <option value="STEALTH_BACKDOOR">3. Stealth Trigger Backdoor Injection</option>
+            <option value="COVARIATE_SHIFT_SURGE">4. High-Velocity Covariate Shift Surge</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+            <label class="form-label">Attack Intensity</label>
+            <span id="intensity-val-text" style="font-size: 12px; font-family: var(--font-mono); color: #f72585; font-weight: 700;">75%</span>
+          </div>
+          <input type="range" class="range-input" id="sandbox-intensity" min="0.2" max="1.0" step="0.05" value="0.75" oninput="updateIntensityDisplay(this.value)">
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 20px;">
+          <button class="btn btn-danger" id="sandbox-inject-btn" onclick="launchSandboxAttack()" style="width: 100%; justify-content: center; padding: 12px; font-size: 14px;">
+            <i data-lucide="skull" style="width: 16px; height: 16px;"></i>
+            <span>Inject Poisoning Attack</span>
+          </button>
+          
+          <button class="btn btn-outline" id="sandbox-stop-btn" onclick="stopSandboxAttack()" style="width: 100%; justify-content: center;">
+            <i data-lucide="pause-circle" style="width: 14px; height: 14px;"></i>
+            <span>Stop Attack Simulation</span>
+          </button>
+
+          <button class="btn btn-outline" onclick="manualRollback()" style="width: 100%; justify-content: center; border-color: var(--status-warning); color: var(--status-warning);">
+            <i data-lucide="shield-alert" style="width: 14px; height: 14px;"></i>
+            <span>Emergency Manual Rollback</span>
+          </button>
+        </div>
+
+        <div id="attack-active-banner" style="display: none; margin-top: 14px; padding: 10px; background: rgba(239, 68, 68, 0.15); border: 1px dashed var(--status-critical); border-radius: var(--radius-sm); font-size: 12px; color: var(--status-critical); text-align: center;">
+          <i data-lucide="alert-triangle" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;"></i>
+          <strong>ATTACK IN PROGRESS:</strong> Decision boundary actively degrading...
+        </div>
+      </div>
+    </section>
+
+    <!-- Bottom Grid: Bilingual Vernacular Alerts & SHA-256 Audit Chain -->
+    <section class="bottom-grid">
+
+      <!-- Left: Vernacular Bilingual Alerts Panel -->
+      <div class="glass-panel" style="padding: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+          <div class="section-title">
+            <i data-lucide="languages" style="color: #fbbf24; width: 20px; height: 20px;"></i>
+            <span>Vernacular Bilingual Alerts & TTS Audio</span>
+          </div>
+          <span style="font-size: 11px; color: var(--text-muted);">Hindi (Devanagari) + Hinglish Readout</span>
+        </div>
+
+        <div id="alerts-feed-container" style="max-height: 380px; overflow-y: auto;">
+          <!-- Alert cards rendered dynamically -->
+        </div>
+      </div>
+
+      <!-- Right: Immutable SHA-256 Hash Chain Explorer -->
+      <div class="glass-panel" style="padding: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+          <div class="section-title">
+            <i data-lucide="git-commit" style="color: var(--accent-cyan); width: 20px; height: 20px;"></i>
+            <span>Immutable SHA-256 Hash-Chain Audit Trail</span>
+          </div>
+          <button class="btn btn-outline" onclick="verifyAuditChain()" style="padding: 4px 10px; font-size: 11px;">
+            <i data-lucide="check-circle" style="width: 12px; height: 12px;"></i>
+            <span>Verify Integrity</span>
+          </button>
+        </div>
+
+        <div class="chain-timeline" id="audit-chain-container">
+          <!-- Block items rendered dynamically -->
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
