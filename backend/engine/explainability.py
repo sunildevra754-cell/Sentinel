@@ -2,7 +2,13 @@ import numpy as np
 import pandas as pd
 import logging
 from typing import Dict, Any, List
-import shap
+
+try:
+    import shap
+    SHAP_AVAILABLE = True
+except Exception:
+    shap = None
+    SHAP_AVAILABLE = False
 
 logger = logging.getLogger("sentinel.explainability")
 
