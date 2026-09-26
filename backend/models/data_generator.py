@@ -1,11 +1,28 @@
 import numpy as np
 import pandas as pd
 from typing import Dict, Any, Tuple
-from faker import Faker
 from backend.config import MODEL_FRAUD_ID, MODEL_KYC_ID
 
-fake = Faker()
-Faker.seed(42)
+try:
+    from faker import Faker
+    fake = Faker()
+    Faker.seed(42)
+except Exception:
+    class FallbackFake:
+        def hexify(self, text="^^^^^^"):
+            import uuid
+            return uuid.uuid4().hex[:len(text)]
+        def ipv4_public(self):
+            import random
+            return f"{random.randint(11, 199)}.{random.randint(1, 254)}.{random.randint(1, 254)}.{random.randint(1, 254)}"
+        def md5(self):
+            import uuid
+            return uuid.uuid4().hex
+        def sha256(self):
+            import hashlib, uuid
+            return hashlib.sha256(uuid.uuid4().bytes).hexdigest()
+    fake = FallbackFake()
+
 np.random.seed(42)
 
 def generate_fraud_dataset(n_samples: int = 4000) -> pd.DataFrame:
