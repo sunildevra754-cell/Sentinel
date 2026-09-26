@@ -5,42 +5,54 @@ import logging
 
 logger = logging.getLogger("sentinel.drift")
 
-def calculate_psi(expected: np.ndarray, actual: np.ndarray, bins: List[float] = None, num_bins: int = 10) -> float:
+def calculate_psi(expected: np.ndarray, actual: np.ndarray, bins: List[float] = None, num_bins: int = 4) -> float:
     """
     Calculates Population Stability Index (PSI) between baseline (expected)
-    and live rolling window (actual).
-    PSI = sum((Actual_% - Expected_%) * ln(Actual_% / Expected_%))
+    and live rolling window (actual) using finite-sample bias correction.
+    Handles discrete categorical variables directly and continuous variables via quantile quartiles.
+    PSI = max(0.0, sum((Actual_% - Expected_%) * ln(Actual_% / Expected_%)) - (k - 1) / N)
     """
-    eps = 1e-3  # Laplace smoothing
+    eps = 0.02  # Bayesian Laplace prior for small sample multinomials
 
     if len(expected) == 0 or len(actual) == 0:
         return 0.0
 
-    if bins is None or len(bins) < 2:
-        # Generate quantile-based bins from expected
-        quantiles = np.linspace(0, 100, num_bins + 1)
-        bins = np.percentile(expected, quantiles)
-        bins = np.unique(bins)
-        if len(bins) < 2:
-            bins = np.linspace(min(expected.min(), actual.min()) - 1,
-                               max(expected.max(), actual.max()) + 1, num_bins + 1)
+    unique_exp = np.unique(expected)
+    # If discrete variable (e.g. binary flag, count <= 6 unique values)
+    if len(unique_exp) <= 6:
+        categories = np.unique(np.concatenate([unique_exp, np.unique(actual)]))
+        exp_counts = np.array([np.sum(expected == cat) for cat in categories], dtype=float)
+        act_counts = np.array([np.sum(actual == cat) for cat in categories], dtype=float)
 
-    bins = list(bins)
-    bins[0] = min(bins[0], float(actual.min()), float(expected.min())) - 1e-3
-    bins[-1] = max(bins[-1], float(actual.max()), float(expected.max())) + 1e-3
+        expected_pct = (exp_counts + eps) / (len(expected) + eps * len(categories))
+        actual_pct = (act_counts + eps) / (len(actual) + eps * len(categories))
 
-    # Bin the data
-    expected_counts, _ = np.histogram(expected, bins=bins)
-    actual_counts, _ = np.histogram(actual, bins=bins)
+        raw_psi = float(np.sum((actual_pct - expected_pct) * np.log(actual_pct / expected_pct)))
+        bias = (len(categories) - 1.0) / max(1.0, float(len(actual)))
+        return max(0.0, raw_psi - bias)
 
-    # Convert to percentages with smoothing
+    # Continuous variable: 4 quantile bins
+    quantiles = np.linspace(0, 100, num_bins + 1)
+    bin_edges = np.percentile(expected, quantiles)
+    bin_edges = np.unique(bin_edges)
+    if len(bin_edges) < 2:
+        bin_edges = np.linspace(min(expected.min(), actual.min()) - 1,
+                                max(expected.max(), actual.max()) + 1, num_bins + 1)
+
+    bin_edges = list(bin_edges)
+    bin_edges[0] = min(bin_edges[0], float(actual.min()), float(expected.min())) - 1e-3
+    bin_edges[-1] = max(bin_edges[-1], float(actual.max()), float(expected.max())) + 1e-3
+
+    expected_counts, _ = np.histogram(expected, bins=bin_edges)
+    actual_counts, _ = np.histogram(actual, bins=bin_edges)
+
     expected_pct = (expected_counts + eps) / (len(expected) + eps * len(expected_counts))
     actual_pct = (actual_counts + eps) / (len(actual) + eps * len(actual_counts))
 
-    # Calculate PSI
-    psi_vector = (actual_pct - expected_pct) * np.log(actual_pct / expected_pct)
-    psi_val = float(np.sum(psi_vector))
-    return max(0.0, psi_val)
+    raw_psi = float(np.sum((actual_pct - expected_pct) * np.log(actual_pct / expected_pct)))
+    k_bins = len(expected_counts)
+    bias = (k_bins - 1.0) / max(1.0, float(len(actual)))
+    return max(0.0, raw_psi - bias)
 
 def calculate_kl_divergence(p: np.ndarray, q: np.ndarray, num_bins: int = 10) -> float:
     """
@@ -79,7 +91,7 @@ def calculate_feature_drift(baseline_df: pd.DataFrame, live_df: pd.DataFrame, fe
         act_mean = float(np.mean(act)) if len(act) > 0 else exp_mean
         shift_ratio = round((act_mean + 1e-5) / (exp_mean + 1e-5), 2)
 
-        if len(act) < 15:
+        if len(act) < 8:
             feature_results[feat] = {
                 "psi": 0.01,
                 "kl": 0.01,
@@ -95,14 +107,10 @@ def calculate_feature_drift(baseline_df: pd.DataFrame, live_df: pd.DataFrame, fe
         psi = calculate_psi(exp, act)
         kl = calculate_kl_divergence(act, exp)
 
-        exp_mean = float(np.mean(exp))
-        act_mean = float(np.mean(act))
-        shift_ratio = round((act_mean + 1e-5) / (exp_mean + 1e-5), 2)
-
         status = "NO_DRIFT"
         if psi >= 0.25:
             status = "SEVERE_DRIFT"
-        elif psi >= 0.10:
+        elif psi >= 0.12:
             status = "MODERATE_DRIFT"
 
         feature_results[feat] = {
@@ -123,7 +131,7 @@ def calculate_feature_drift(baseline_df: pd.DataFrame, live_df: pd.DataFrame, fe
     severity = "HEALTHY"
     if max_psi_val >= 0.25 or composite_psi >= 0.20:
         severity = "CRITICAL"
-    elif max_psi_val >= 0.10 or composite_psi >= 0.08:
+    elif max_psi_val >= 0.12 or composite_psi >= 0.08:
         severity = "WARNING"
 
     return {

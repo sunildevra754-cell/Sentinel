@@ -70,7 +70,7 @@ class ManagedModel:
         self.last_explanation = "Model operating within normal baseline boundaries."
         self.last_alert_payload: Optional[Dict[str, Any]] = None
 
-    def predict(self, input_data: Dict[str, Any], is_attack_active: bool = False) -> Dict[str, Any]:
+    def predict(self, input_data: Dict[str, Any], is_attack_active: bool = False, attack_intensity: float = 0.65) -> Dict[str, Any]:
         """
         Executes real-time inference with honeypot evaluation, graduated throttling,
         drift monitoring, trust calculation, and automatic failover.
@@ -127,13 +127,22 @@ class ManagedModel:
                 decision = "STEP_UP_IDENTITY_CHALLENGE (Throttled: High Certainty Needed)"
             throttling_action = "STRICT_THROTTLE"
 
-        # Track anomalies
-        is_anomaly = (prob_risk > 0.70 or is_honeypot)
+        # Track model integrity anomalies (extreme OOD feature outliers or honeypot probe hits)
+        is_ood = False
+        for feat in self.features:
+            val = feature_vals[feat]
+            mean = float(self.baseline_df[feat].mean())
+            std = max(1e-3, float(self.baseline_df[feat].std()))
+            if abs(val - mean) / std > 6.5:
+                is_ood = True
+                break
+
+        is_anomaly = (is_honeypot or is_ood)
         self.recent_anomalies.append(1 if is_anomaly else 0)
         anomaly_rate = sum(self.recent_anomalies) / max(1, len(self.recent_anomalies))
 
         # 5. Compute Feature Drift (PSI & KL Divergence)
-        if len(self.rolling_window) >= 10:
+        if len(self.rolling_window) >= 8:
             live_df = pd.DataFrame(list(self.rolling_window))
             self.last_drift_result = calculate_feature_drift(self.baseline_df, live_df, self.features)
 
@@ -145,7 +154,8 @@ class ManagedModel:
             anomaly_rate=anomaly_rate,
             honeypot_hit_count=honeypot_hits,
             is_attack_active=is_attack_active,
-            is_rolled_back=self.is_rolled_back
+            is_rolled_back=self.is_rolled_back,
+            attack_intensity=attack_intensity
         )
         self.status = new_status
 
@@ -271,6 +281,13 @@ class ManagedModel:
         self.trust_engine.throttling_level = "NONE"
         self.trust_engine.auto_approval_threshold = 0.50
         self.last_alert_payload = None
+        self.last_drift_result = {
+            "composite_psi": 0.01,
+            "max_psi": 0.01,
+            "max_drifting_feature": self.features[0],
+            "severity": "HEALTHY",
+            "features": {}
+        }
 
         audit_details = {
             "event": "MANUAL_SYSTEM_RESET_HEALTHY",

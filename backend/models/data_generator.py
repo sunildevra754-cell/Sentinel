@@ -114,31 +114,32 @@ def generate_kyc_dataset(n_samples: int = 4000) -> pd.DataFrame:
 def generate_live_sample(model_id: str, is_attack: bool = False, attack_intensity: float = 0.5) -> Dict[str, Any]:
     """Generates a single incoming real-time feature payload (normal or poisoned)."""
     if model_id == MODEL_FRAUD_ID:
-        if not is_attack:
-            # Normal clean traffic distribution
-            amount = float(np.random.lognormal(mean=4.2, sigma=1.0))
-            amount = round(min(max(amount, 10.0), 3000.0), 2)
-            velocity = int(np.random.poisson(lam=1.5) + 1)
+        # Check if this specific transaction is poisoned based on intensity probability
+        is_poisoned_tx = is_attack and (np.random.rand() < max(0.25, attack_intensity))
+
+        if not is_poisoned_tx:
+            # Clean transaction drawn from exact baseline distribution
+            amount = float(np.random.lognormal(mean=4.2, sigma=1.1))
+            amount = round(float(np.clip(amount, 5.0, 5000.0)), 2)
+            velocity = int(np.clip(np.random.poisson(lam=1.8) + 1, 1, 15))
             loc_mismatch = round(float(np.random.beta(1.5, 5.0)), 3)
             device_trust = round(float(np.random.beta(6.0, 1.5)), 3)
-            account_age = int(np.random.exponential(400) + 10)
-            foreign_ip = 1 if np.random.rand() < 0.10 else 0
-            failed_attempts = int(np.random.choice([0, 1, 2], p=[0.85, 0.12, 0.03]))
+            account_age = int(np.clip(np.random.exponential(400) + 5, 1, 3650))
+            foreign_ip = 1 if np.random.rand() < 0.12 else 0
+            failed_attempts = int(np.random.choice([0, 1, 2, 3, 4], p=[0.75, 0.15, 0.06, 0.03, 0.01]))
             merchant_risk = round(float(np.random.beta(2.0, 4.0)), 3)
         else:
-            # Poisoned / Anomaly pattern: High velocity, forged device, sudden foreign IP drift
-            # Attackers attempting to bypass high amounts with poisoned device features
+            # Poisoned attack sample scaled with intensity
             shift = attack_intensity
-            amount = float(np.random.uniform(900.0, 4500.0)) * (1.0 + 0.3 * shift)
+            amount = float(np.random.uniform(1200.0, 4800.0)) * (1.0 + 0.8 * shift)
             amount = round(amount, 2)
-            velocity = int(np.random.randint(6, 14))
-            loc_mismatch = round(min(0.98, float(np.random.uniform(0.65, 0.99))), 3)
-            # Attackers try spoofing device trust to slip through
-            device_trust = round(max(0.05, float(np.random.uniform(0.1, 0.4))), 3)
-            account_age = int(np.random.randint(1, 45))
-            foreign_ip = 1 if np.random.rand() < (0.6 + 0.3 * shift) else 0
+            velocity = int(np.random.randint(5, 14))
+            loc_mismatch = round(min(0.99, float(np.random.uniform(0.70, 0.99))), 3)
+            device_trust = round(max(0.02, float(np.random.uniform(0.05, 0.35))), 3)
+            account_age = int(np.random.randint(1, 40))
+            foreign_ip = 1 if np.random.rand() < (0.7 + 0.25 * shift) else 0
             failed_attempts = int(np.random.randint(2, 5))
-            merchant_risk = round(float(np.random.uniform(0.6, 0.95)), 3)
+            merchant_risk = round(float(np.random.uniform(0.7, 0.98)), 3)
             
         return {
             "amount": amount,
@@ -155,27 +156,28 @@ def generate_live_sample(model_id: str, is_attack: bool = False, attack_intensit
         }
     else:
         # MODEL_KYC_ID
-        if not is_attack:
+        is_poisoned_tx = is_attack and (np.random.rand() < max(0.25, attack_intensity))
+
+        if not is_poisoned_tx:
             income = float(np.random.lognormal(11.1, 0.55))
-            income = round(min(max(income, 22000), 280000), -2)
-            dti = round(float(np.random.beta(2.5, 4.5)), 3)
-            credit_score = int(np.clip(np.random.normal(680, 75), 450, 850))
-            emp_years = round(float(np.random.exponential(6.0)), 1)
+            income = round(float(np.clip(income, 18000, 350000)), -2)
+            dti = round(float(np.clip(np.random.beta(2.5, 4.5), 0.05, 0.85)), 3)
+            credit_score = int(np.clip(np.random.normal(680, 80), 300, 850))
+            emp_years = round(float(np.clip(np.random.exponential(6.0), 0.0, 35.0)), 1)
             doc_score = round(float(np.random.beta(7.0, 1.2)), 3)
-            utility_ok = 1 if np.random.rand() < 0.85 else 0
-            defaults = int(np.random.choice([0, 1], p=[0.88, 0.12]))
-            inquiries = int(np.random.poisson(1.2))
+            utility_ok = 1 if np.random.rand() < 0.82 else 0
+            defaults = int(np.random.choice([0, 1, 2, 3], p=[0.82, 0.12, 0.04, 0.02]))
+            inquiries = int(np.clip(np.random.poisson(1.5), 0, 10))
         else:
             shift = attack_intensity
-            # Forged synthetic KYC profiles with exaggerated income & manipulated bureau velocity
-            income = float(np.random.uniform(180000, 420000))
-            dti = round(float(np.random.uniform(0.55, 0.88)), 3)
-            credit_score = int(np.random.randint(510, 640))
-            emp_years = round(float(np.random.uniform(0.2, 2.0)), 1)
-            doc_score = round(float(np.random.uniform(0.35, 0.65)), 3)
-            utility_ok = 1 if np.random.rand() < 0.25 else 0
-            defaults = int(np.random.randint(1, 4))
-            inquiries = int(np.random.randint(6, 12))
+            income = float(np.random.uniform(220000, 550000))
+            dti = round(float(np.random.uniform(0.60, 0.92)), 3)
+            credit_score = int(np.random.randint(480, 620))
+            emp_years = round(float(np.random.uniform(0.1, 1.5)), 1)
+            doc_score = round(float(np.random.uniform(0.25, 0.55)), 3)
+            utility_ok = 1 if np.random.rand() < 0.15 else 0
+            defaults = int(np.random.randint(2, 4))
+            inquiries = int(np.random.randint(7, 14))
             
         return {
             "annual_income": income,

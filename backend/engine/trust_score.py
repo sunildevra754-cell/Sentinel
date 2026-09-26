@@ -26,7 +26,8 @@ class TrustScoreEngine:
         anomaly_rate: float,
         honeypot_hit_count: int,
         is_attack_active: bool,
-        is_rolled_back: bool
+        is_rolled_back: bool,
+        attack_intensity: float = 0.65
     ) -> Tuple[float, str, str, float]:
         """
         Calculates the real-time Model Trust Score (0-100), status, throttling level,
@@ -43,33 +44,30 @@ class TrustScoreEngine:
         # Base score starting at 100
         score = 100.0
 
-        # 1. Drift Penalty (based on max PSI and composite PSI)
-        # Normal PSI < 0.10: 0 to 5 penalty
-        # Moderate PSI 0.10 - 0.25: 10 to 30 penalty
-        # Severe PSI > 0.25: 35 to 65 penalty
-        if max_psi < 0.10:
-            drift_penalty = max_psi * 30.0  # max ~3.0
-        elif max_psi < 0.25:
-            drift_penalty = 10.0 + (max_psi - 0.10) / 0.15 * 25.0  # 10 to 35
+        # 1. Drift Penalty (based on composite PSI and max feature PSI)
+        if composite_psi < 0.10 and max_psi < 0.20:
+            drift_penalty = composite_psi * 15.0 + max(0.0, max_psi - 0.10) * 20.0
+        elif composite_psi < 0.20 and max_psi < 0.35:
+            drift_penalty = 6.0 + (composite_psi / 0.20) * 14.0 + (max_psi / 0.35) * 14.0
         else:
-            drift_penalty = 35.0 + min(40.0, (max_psi - 0.25) * 60.0)  # 35 to 75
+            drift_penalty = 28.0 + min(42.0, (composite_psi * 35.0 + max_psi * 25.0))
 
-        # 2. Anomaly Rate Penalty (normal anomaly rate ~ 0.05-0.10)
-        excess_anomalies = max(0.0, anomaly_rate - 0.12)
+        # 2. Anomaly Rate Penalty (organic denial rate in lending is ~15-20%)
+        excess_anomalies = max(0.0, anomaly_rate - 0.28)
         anomaly_penalty = min(25.0, excess_anomalies * 50.0)
 
         # 3. Honeypot Penalty (direct probing penalty)
         honeypot_penalty = min(35.0, honeypot_hit_count * 20.0)
 
-        # 4. Attack Active Multiplier
-        attack_penalty = 15.0 if is_attack_active else 0.0
+        # 4. Attack Active Multiplier (scales directly with attack intensity)
+        attack_penalty = (24.0 * attack_intensity + 4.0) if is_attack_active else 0.0
 
         # Calculate total score
         total_penalty = drift_penalty + anomaly_penalty + honeypot_penalty + attack_penalty
         score = max(5.0, min(100.0, 100.0 - total_penalty))
 
         # Smooth changes (exponential moving average)
-        alpha = 0.45 if is_attack_active else 0.25
+        alpha = (0.28 + 0.32 * attack_intensity) if is_attack_active else 0.12
         self.current_score = round(alpha * score + (1.0 - alpha) * self.current_score, 1)
 
         # Determine Graduated Response & Throttling
